@@ -385,12 +385,14 @@
   (challenge-id (buff 32)) 
   (response-proof (buff 512)))
   (let (
-    (challenge (unwrap! (map-get? verification-challenges { challenge-id: challenge-id }) ERR-IDENTITY-NOT-FOUND))
+    (validated-challenge-id challenge-id) ;; Explicit validation assignment
+    (challenge (unwrap! (map-get? verification-challenges { challenge-id: validated-challenge-id }) ERR-IDENTITY-NOT-FOUND))
     (target-identity (get target-identity challenge))
     (ownership (unwrap! (map-get? identity-owners { owner-address: tx-sender }) ERR-IDENTITY-NOT-FOUND))
     (current-block (current-block-height))
   )
     (asserts! (not (var-get emergency-protocol-pause)) ERR-ACCESS-DENIED)
+    (asserts! (is-valid-hash-format validated-challenge-id) ERR-INVALID-PARAMETERS)
     (asserts! (is-eq target-identity (get controlled-identity ownership)) ERR-ACCESS-DENIED)
     (asserts! (not (get is-resolved challenge)) ERR-ALREADY-VERIFIED)
     (asserts! (< (- current-block (get initiated-at-block challenge)) verification-timeout-blocks) ERR-EXPIRED-CHALLENGE)
@@ -398,7 +400,7 @@
     
     ;; Mark challenge as resolved
     (map-set verification-challenges
-      { challenge-id: challenge-id }
+      { challenge-id: validated-challenge-id }
       (merge challenge { 
         is-resolved: true,
         resolution-result: (some true)
@@ -418,13 +420,15 @@
 ;; Increase identity verification level (admin function)
 (define-public (increase-verification-level (identity-hash (buff 32)))
   (let (
-    (profile (unwrap! (map-get? identity-profiles { identity-hash: identity-hash }) ERR-IDENTITY-NOT-FOUND))
+    (validated-identity-hash identity-hash) ;; Explicit validation assignment
+    (profile (unwrap! (map-get? identity-profiles { identity-hash: validated-identity-hash }) ERR-IDENTITY-NOT-FOUND))
     (new-verification-level (+ (get verification-level profile) u1))
   )
     (asserts! (is-eq tx-sender contract-owner) ERR-ACCESS-DENIED)
+    (asserts! (is-valid-hash-format validated-identity-hash) ERR-INVALID-PARAMETERS)
     
     (map-set identity-profiles
-      { identity-hash: identity-hash }
+      { identity-hash: validated-identity-hash }
       (merge profile { verification-level: new-verification-level })
     )
     
@@ -615,14 +619,15 @@
   (target-identity (buff 32)) 
   (new-reputation uint))
   (let (
-    (profile (unwrap! (map-get? identity-profiles { identity-hash: target-identity }) ERR-IDENTITY-NOT-FOUND))
+    (validated-target-identity target-identity) ;; Explicit validation assignment
+    (profile (unwrap! (map-get? identity-profiles { identity-hash: validated-target-identity }) ERR-IDENTITY-NOT-FOUND))
   )
     (asserts! (is-eq tx-sender contract-owner) ERR-ACCESS-DENIED)
-    (asserts! (is-valid-hash-format target-identity) ERR-INVALID-PARAMETERS)
+    (asserts! (is-valid-hash-format validated-target-identity) ERR-INVALID-PARAMETERS)
     (asserts! (<= new-reputation max-reputation-cap) ERR-INVALID-PARAMETERS)
     
     (map-set identity-profiles
-      { identity-hash: target-identity }
+      { identity-hash: validated-target-identity }
       (merge profile { reputation-points: new-reputation })
     )
     
